@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>CASA DOMOTICA</title>
+<style>
+body { font-family: Arial; background:#f0f0f0; text-align:center; padding:20px; }
+.card {
+  width: 270px; margin: 10px auto; padding: 15px;
+  background: white; border-radius: 12px;
+  box-shadow: 0px 4px 10px rgba(0,0,0,0.2); font-size: 20px;
+}
+.btn {
+  padding: 12px 20px; margin: 5px;
+  background: #007bff; color:white; border-radius:8px; cursor:pointer;
+  font-size: 18px; border:none;
+}
+.alerta { font-size: 24px; font-weight: bold; }
+</style>
+</head>
+
+<body>
+
+<h1>CASA DOMOTICA</h1>
+<button class="btn" onclick="connectBLE()">Conectar Bluetooth</button>
+
+<div id="panel"></div>
+
+<h2>Control Manual</h2>
+<button class="btn" onclick="sendCmd('VENT_ON')">Ventilador ON</button>
+<button class="btn" onclick="sendCmd('VENT_OFF')">Ventilador OFF</button>
+<br>
+<button class="btn" onclick="sendCmd('CAL_ON')">Calefactor ON</button>
+<button class="btn" onclick="sendCmd('CAL_OFF')">Calefactor OFF</button>
+
+<script>
+let tempChar, cmdChar;
+
+async function connectBLE() {
+  let device = await navigator.bluetooth.requestDevice({
+    filters: [{ name: "TUVN casa domotica" }],
+    optionalServices: ["1234"]
+  });
+
+  let server = await device.gatt.connect();
+  let service = await server.getPrimaryService("1234");
+
+  tempChar = await service.getCharacteristic("ABCD");
+  cmdChar = await service.getCharacteristic("DCBA");
+
+  await tempChar.startNotifications();
+  tempChar.addEventListener("characteristicvaluechanged", readData);
+
+  alert("Conectado al ESP32");
+}
+
+function readData(event) {
+  let json = new TextDecoder().decode(event.target.value);
+  let d = JSON.parse(json);
+
+  document.getElementById("panel").innerHTML = `
+    <div class='card'>Garaje: <b>${d.s1}°C</b></div>
+    <div class='card'>Patio: <b>${d.s2}°C</b></div>
+    <div class='card'>Sala: <b>${d.s3}°C</b></div>
+    <div class='card'>Comedor: <b>${d.s4}°C</b></div>
+    <div class='card'><b>Promedio: ${d.promedio}°C</b></div>
+    <div class='card alerta'>Alerta: ${d.alerta}</div>
+  `;
+}
+
+function sendCmd(cmd) {
+  if (!cmdChar) return alert("Conéctate primero");
+  cmdChar.writeValue(new TextEncoder().encode(cmd));
+}
+</script>
+
+</body>
+</html>
